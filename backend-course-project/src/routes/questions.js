@@ -1,32 +1,30 @@
 const express = require("express");
 const router = express.Router();
 
-const quiz = require("../data/quiz");
+const questions = require("../data/quiz");
 
 
-// GET 
+// GET
 router.get("/", (req, res) => {
   const { keyword } = req.query;
 
   if (!keyword) {
-    return res.json(quiz);
+    return res.json(questions);
   }
 
-  const filtered = quiz.filter(item =>
-    item.question.toLowerCase().includes(keyword.toLowerCase()) ||
-    item.answer.toLowerCase().includes(keyword.toLowerCase()) ||
-    item.keywords.includes(keyword.toLowerCase())
+  const filtered = questions.filter(q =>
+    q.keywords.includes(keyword.toLowerCase())
   );
 
   res.json(filtered);
 });
 
 
-// GET 
+// GET by id
 router.get("/:quizId", (req, res) => {
   const quizId = Number(req.params.quizId);
 
-  const item = quiz.find(p => p.id === quizId);
+  const item = questions.find(p => p.id === quizId);
 
   if (!item) {
     return res.status(404).json({ message: "Not found" });
@@ -36,7 +34,7 @@ router.get("/:quizId", (req, res) => {
 });
 
 
-// POST 
+// POST
 router.post("/", (req, res) => {
   const { question, answer, keywords } = req.body;
 
@@ -46,7 +44,7 @@ router.post("/", (req, res) => {
     });
   }
 
-  const maxId = Math.max(...quiz.map(p => p.id), 0);
+  const maxId = Math.max(...questions.map(p => p.id), 0);
 
   const newItem = {
     id: maxId + 1,
@@ -55,17 +53,17 @@ router.post("/", (req, res) => {
     keywords: Array.isArray(keywords) ? keywords : []
   };
 
-  quiz.push(newItem);
+  questions.push(newItem);
 
   res.status(201).json(newItem);
 });
 
 
-// PUT 
+// PUT
 router.put("/:quizId", (req, res) => {
   const quizId = Number(req.params.quizId);
 
-  const item = quiz.find(p => p.id === quizId);
+  const item = questions.find(p => p.id === quizId);
 
   if (!item) {
     return res.status(404).json({ message: "Not found" });
@@ -91,13 +89,13 @@ router.put("/:quizId", (req, res) => {
 router.delete("/:quizId", (req, res) => {
   const quizId = Number(req.params.quizId);
 
-  const index = quiz.findIndex(p => p.id === quizId);
+  const index = questions.findIndex(p => p.id === quizId);
 
   if (index === -1) {
     return res.status(404).json({ message: "Not found" });
   }
 
-  const deleted = quiz.splice(index, 1);
+  const deleted = questions.splice(index, 1);
 
   res.json({
     message: "Deleted successfully",
