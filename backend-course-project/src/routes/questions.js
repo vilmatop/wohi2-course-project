@@ -1,8 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const prisma = require("../lib/prisma");
-
+const authenticate = require("../middleware/auth");
+const isOwner = require("../middleware/isOwner");
 //const questions = require("../data/quiz");
+
+router.use(authenticate);
 
 function formatPost(post) {
   return {
@@ -64,6 +67,7 @@ router.post("/", async (req, res) => {
   const newPost = await prisma.post.create({
     data: {
       title, date: new Date(date), content,
+      userId: req.user.userId,
       keywords: {
         connectOrCreate: keywordsArray.map((kw) => ({
           where: { name: kw }, create: { name: kw },
@@ -78,7 +82,7 @@ router.post("/", async (req, res) => {
 
 
 // PUT
-router.put("/:postId", async (req, res) => {
+router.put("/:postId", isOwner, async (req, res) => {
   const postId = Number(req.params.postId);
   const { title, date, content, keywords } = req.body;
   const existingPost = await prisma.post.findUnique({ where: { id: postId } });

@@ -1,6 +1,18 @@
 const { PrismaClient } = require("@prisma/client");
+const bcrypt = require("bcrypt");
 const prisma = new PrismaClient();
 
+async function main() {
+  const hashedPassword = await bcrypt.hash("1234", 10);
+  const user = await prisma.user.create({
+    data: {
+      email: "vilma.toppila@gmail.com",
+      password: hashedPassword,
+      name: "Vilma Toppila",
+    },
+  });
+  console.log("Created user:", user.email);
+}
 const seedPosts = [
   {
     title: "Introduction to HTTP",
@@ -42,6 +54,7 @@ async function main() {
         title: post.title,
         date: post.date,
         content: post.content,
+        userId: user.id,
         keywords: {
           connectOrCreate: post.keywords.map((kw) => ({
             where: { name: kw },

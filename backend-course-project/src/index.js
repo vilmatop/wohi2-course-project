@@ -2,9 +2,12 @@ const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const postsRouter = require("./routes/questions");
+const authRouter = require("./routes/auth");
+
 // Middleware to parse JSON bodies (will be useful in later steps)
 app.use(express.json());
 // everything under /api/posts
+app.use("/api/auth", authRouter);
 app.use("/api/questions", postsRouter);
 
 app.use((req, res) => {
