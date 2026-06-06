@@ -8,11 +8,11 @@ async function isOwner(req, res, next) {
     });
 
     if (!post) {
-        return res.status(404).json({ message: "Post not found" });
+        throw new NotFoundError("Post not found");
     }
 
     if (post.userId !== req.user.userId) {
-        return res.status(403).json({error: "You can only modify your own posts" });
+        throw new ForbiddenError("You can only modify your own posts");
     }
 
     req.post = post;

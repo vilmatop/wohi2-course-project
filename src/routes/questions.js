@@ -5,6 +5,15 @@
   const isOwner = require("../middleware/isOwner");
   const multer = require("multer");
   const path = require("path");
+  const { NotFoundError } = require("../lib/errors");
+  const {z} = require("zod");
+
+  const PostInput = z.object({
+    title: z.string().min(1),
+    date: z.string(),
+    content: z.string().min(1),
+    keywords: z.union([z.string(), z.array(z.string())]).optional(),
+  });
 
   const storage = multer.diskStorage({
     destination: path.join(__dirname, "..","..","public","uploads"),
@@ -28,13 +37,11 @@
     })
   //const questions = require("../data/quiz");
 
-  router.use(authenticate);
-
   function formatPost(post) {
     return {
       ...post,
-      date: post.date.toISOString().split("T")[0],
-      keywords: post.keywords.map((k) => k.name),
+      date: post.date instanceof Date ? post.date.toISOString().split("T")[0] : post.date,
+      keywords: (post.keywords || []).map((k) => k.name),
       userName: post.user?.name || null,
       liked: post.likes && post.likes.length > 0,
       likeCount: post._count.likes ?? 0,
@@ -43,6 +50,8 @@
       likes: undefined, 
     };
   }
+
+  router.use(authenticate);
 
   // GET /api/posts, /api/posts?keyword=http&oage=1&limit=5
   router.get("/", async (req, res) => {
@@ -89,9 +98,7 @@
     });
 
     if (!post) {
-      return res.status(404).json({ 
-      message: "Post not found" 
-      });
+      throw new NotFoundError("Post not found");
     }
 
     res.json(formatPost(post));
@@ -101,25 +108,30 @@
 
   // POST /api/posts
   router.post("/", upload.single("image"), async (req, res) => {
-    const { title, date, content, keywords } = req.body;
+    const { title, date, content, keywords } = PostInput.parse(req.body);
 
-    if (!title || !date || !content) {
-      return res.status(400).json({ msg: 
-    "title, date and content are mandatory" });
-    }
-
-    const keywordsArray = Array.isArray(keywords) ? keywords : [];
+    const keywordsArray = Array.isArray(keywords) ? keywords : (keywords ? [keywords] : []);
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
     const newPost = await prisma.post.create({
       data: {
-        title, date: new Date(date), content, imageUrl,
+        title,
+        date: new Date(date),
+        content,
+        imageUrl,
         userId: req.user.userId,
         keywords: {
           connectOrCreate: keywordsArray.map((kw) => ({
-            where: { name: kw }, create: { name: kw },
-          })), },
+            where: { name: kw },
+            create: { name: kw },
+          })),
+        },
       },
-      include: { keywords: true, user: true  },
+      include: {
+        keywords: true,
+        user: true,
+        likes: { where: { userId: req.user.userId }, take: 1 },
+        _count: { select: { likes: true } },
+      },
     });
 
     res.status(201).json(formatPost(newPost));
@@ -136,11 +148,11 @@
       include: { keywords: true, user: true }
     });
     if (!existingPost) {
-      return res.status(404).json({ message: "Post not found" });
+      throw new NotFoundError("Post not found");
     }
 
     if (!title || !date || !content) {
-      return res.status(400).json({ msg: "title, date and content are mandatory" });
+      throw new Error("title, date and content are mandatory");
     }
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
 
@@ -157,7 +169,12 @@
           })),
         },
       },
-      include: { keywords: true, user: true },
+      include: {
+        keywords: true,
+        user: true,
+        likes: { where: { userId: req.user.userId }, take: 1 },
+        _count: { select: { likes: true } },
+      },
     });
     res.json(formatPost(updatedPost));
   });
@@ -175,7 +192,7 @@
     });
 
     if (!post) {
-      return res.status(404).json({ message: "Post not found" });
+      throw new NotFoundError("Post not found");
     }
 
     await prisma.post.delete({ where: { id: postId } });
@@ -195,7 +212,7 @@
     }
 
     const like = await prisma.like.upsert({
-      where: {usedId_postId: { userId: req.user.userId, postId }},
+      where: { userId_postId: { userId: req.user.userId, postId } },
       update: {},
       create: { userId: req.user.userId, postId },
     });
@@ -220,7 +237,7 @@
     }
 
     const like = await prisma.like.deleteMany({
-      where: {usedId: req.user.userId, postId },
+      where: { userId: req.user.userId, postId },
     });
 
     const likeCount = await prisma.like.count({ where: { postId }});
